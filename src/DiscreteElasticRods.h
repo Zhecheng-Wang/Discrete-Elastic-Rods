@@ -1,20 +1,20 @@
 #ifndef __DISCRETE_ELASTIC_RODS_H__
 #define __DISCRETE_ELASTIC_RODS_H__
 
+// std
+#include <vector>
+// Eigen
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <Eigen/Sparse>
-#include <vector>
+// project
 #include "SimParameters.h"
 
-class DiscreteElasticRods
-{
-    public:
-    Eigen::VectorXd x_ref;
+class DiscreteElasticRods {
+public:
     Eigen::VectorXd x;
     std::vector<bool> is_fixed;
     Eigen::VectorXd v;
-    Eigen::VectorXd omega;
     Eigen::VectorXd e;
     Eigen::VectorXd length_rest;
     Eigen::VectorXd l_ref;
@@ -33,9 +33,12 @@ class DiscreteElasticRods
 
     // simulation parameters
     SimParameters params;
-    bool verbose = true;
+    bool verbose = false;
 
     // visualization
+    double stretching_energy = 0.;
+    double bending_energy = 0.;
+    double twisting_energy = 0.;
     std::vector<Eigen::Vector3d> vis_gradient;
     std::vector<Eigen::Vector3d> vis_stretching_force;
     std::vector<Eigen::Vector3d> vis_bending_force;
@@ -43,7 +46,8 @@ class DiscreteElasticRods
 
     DiscreteElasticRods();
 
-    void initSimulation(int nv_, Eigen::VectorXd x_, Eigen::VectorXd theta_, std::vector<bool> is_fixed_, SimParameters params_);
+    void initSimulation(int nv_, Eigen::VectorXd x_, Eigen::VectorXd theta_, std::vector<bool> is_fixed_,
+            SimParameters params_);
 
     void simulateOneStep();
 
@@ -54,9 +58,9 @@ class DiscreteElasticRods
     std::tuple<Eigen::MatrixXd, Eigen::SparseMatrix<double> > createZeroGradientAndHessian();
 
     void computeGradientAndHessian(Eigen::VectorXd& gradient,
-                                   Eigen::SparseMatrix<double>& hessian,
-                                   Eigen::MatrixX3d& d3,
-                                   Eigen::VectorXd& twist);
+            Eigen::SparseMatrix<double>& hessian,
+            Eigen::MatrixX3d& d3,
+            Eigen::VectorXd& twist);
 
     void updateCenterlineVelocity(Eigen::VectorXd& gradient);
 
@@ -68,14 +72,9 @@ class DiscreteElasticRods
 
     void updateCurvatureBinormal(Eigen::MatrixX3d d3);
 
-    Eigen::MatrixX3d unitTangents(const Eigen::VectorXd x_);
+    Eigen::MatrixX3d unitTangents(Eigen::VectorXd& x_);
 
     Eigen::Vector3d parallelTransport(Eigen::Vector3d v, Eigen::Vector3d r1, Eigen::Vector3d r2);
-
-    double applyStretchingForce(Eigen::VectorXd& gradient,
-                                std::vector<Eigen::Triplet<double>>& hessian,
-                                Eigen::MatrixX3d& d3,
-                                Eigen::VectorXd& stretching_force);
 
     void getMaterialCurvature(Eigen::MatrixX2d& kappa);
 
@@ -85,28 +84,32 @@ class DiscreteElasticRods
 
     Eigen::Matrix3d getCrossMatrix(Eigen::Vector3d v);
 
+    double applyStretchingForce(Eigen::VectorXd& gradient,
+            std::vector<Eigen::Triplet<double>>& hessian,
+            Eigen::MatrixX3d& d3,
+            Eigen::VectorXd& stretching_force);
+
     double applyBendingForce(Eigen::VectorXd& gradient,
-                             std::vector<Eigen::Triplet<double>>& hessian,
-                             Eigen::MatrixX3d& d3,
-                             Eigen::VectorXd& bending_force);
+            std::vector<Eigen::Triplet<double>>& hessian,
+            Eigen::MatrixX3d& d3,
+            Eigen::VectorXd& bending_force);
 
     double applyTwistingForce(Eigen::VectorXd& gradient,
-                              std::vector<Eigen::Triplet<double>>& hessian,
-                              Eigen::VectorXd& twist,
-                              Eigen::VectorXd& twisting_force);
+            std::vector<Eigen::Triplet<double>>& hessian,
+            Eigen::VectorXd& twist,
+            Eigen::VectorXd& twisting_force);
 
     double applyGravity(Eigen::VectorXd& gradient);
 
     void buildVisualization(Eigen::VectorXd& gradient);
 
     void buildForceVisualization(Eigen::VectorXd& stretching_force,
-                                 Eigen::VectorXd& bending_force,
-                                 Eigen::VectorXd& twisting_force);
+            Eigen::VectorXd& bending_force,
+            Eigen::VectorXd& twisting_force);
 
-    protected:
-    
+protected:
 
-    private:
+private:
 };
 
 #endif

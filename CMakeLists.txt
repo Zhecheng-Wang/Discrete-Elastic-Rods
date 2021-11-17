@@ -5,7 +5,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 if(NOT CMAKE_BUILD_TYPE)
 	message(STATUS "No build type selected, default to Release")
-	set(CMAKE_BUILD_TYPE "DEBUG")
+	set(CMAKE_BUILD_TYPE "Release")
 endif()
 
 # Find libigl
