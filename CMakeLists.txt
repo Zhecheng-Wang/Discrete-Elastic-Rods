@@ -13,7 +13,7 @@ find_package(libigl REQUIRED)
 
 # Find Polyscope
 find_package(Polyscope REQUIRED)
-  
+
 file(GLOB SRCFILES src/*.cpp src/*.h src/*.hpp)
 
 add_executable(${PROJECT_NAME} ${SRCFILES})

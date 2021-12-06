@@ -19,6 +19,7 @@ struct SimParameters {
   bool stretching_energy_enabled;
   bool bending_energy_enabled;
   bool twisting_energy_enabled;
+  bool spring_energy_enabled;
 
   SimParameters()
   {
@@ -38,6 +39,7 @@ struct SimParameters {
       stretching_energy_enabled = true;
       bending_energy_enabled = true;
       twisting_energy_enabled = true;
+      spring_energy_enabled = true;
   }
 };
 

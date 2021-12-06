@@ -3,6 +3,7 @@
 
 // std
 #include <vector>
+#include <functional>
 // Eigen
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -23,6 +24,7 @@ public:
     Eigen::MatrixX2d kappa_ref;
     Eigen::VectorXd twist_rest;
     int nv;
+    std::function<void(Eigen::VectorXd&)> applyExternalForce = nullptr;
 
     // time-parallel frame
     Eigen::MatrixX3d d1_ref;
@@ -39,6 +41,8 @@ public:
     double stretching_energy = 0.;
     double bending_energy = 0.;
     double twisting_energy = 0.;
+    double potential_energy = 0.;
+    double kinetic_energy = 0.;
     std::vector<Eigen::Vector3d> vis_gradient;
     std::vector<Eigen::Vector3d> vis_stretching_force;
     std::vector<Eigen::Vector3d> vis_bending_force;
@@ -49,7 +53,7 @@ public:
     void initSimulation(int nv_, Eigen::VectorXd x_, Eigen::VectorXd theta_, std::vector<bool> is_fixed_,
             SimParameters params_);
 
-    void simulateOneStep();
+    virtual void simulateOneStep();
 
     void updateCenterlinePosition(void);
 
@@ -57,7 +61,7 @@ public:
 
     std::tuple<Eigen::MatrixXd, Eigen::SparseMatrix<double> > createZeroGradientAndHessian();
 
-    void computeGradientAndHessian(Eigen::VectorXd& gradient,
+    virtual void computeGradientAndHessian(Eigen::VectorXd& gradient,
             Eigen::SparseMatrix<double>& hessian,
             Eigen::MatrixX3d& d3,
             Eigen::VectorXd& twist);
@@ -100,6 +104,8 @@ public:
             Eigen::VectorXd& twisting_force);
 
     double applyGravity(Eigen::VectorXd& gradient);
+
+    double computeKineticEnergy();
 
     void buildVisualization(Eigen::VectorXd& gradient);
 
