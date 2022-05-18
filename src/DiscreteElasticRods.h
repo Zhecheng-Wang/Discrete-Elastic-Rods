@@ -3,16 +3,20 @@
 
 // std
 #include <vector>
+#include <functional>
 // Eigen
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <Eigen/Sparse>
 // project
 #include "SimParameters.h"
+// iheartla
+#include "lib.h"
 
 class DiscreteElasticRods {
 public:
     Eigen::VectorXd x;
+    Eigen::VectorXd x_ref;
     std::vector<bool> is_fixed;
     Eigen::VectorXd v;
     Eigen::VectorXd e;
@@ -20,9 +24,11 @@ public:
     Eigen::VectorXd l_ref;
     Eigen::VectorXd length;
     Eigen::MatrixX3d kb;
+    Eigen::MatrixX3d kb_ref;
     Eigen::MatrixX2d kappa_ref;
     Eigen::VectorXd twist_rest;
     int nv;
+    std::function<void(Eigen::VectorXd&)> applyExternalForce = nullptr;
 
     // time-parallel frame
     Eigen::MatrixX3d d1_ref;
@@ -33,12 +39,14 @@ public:
 
     // simulation parameters
     SimParameters params;
-    bool verbose = false;
+    bool verbose = true;
 
     // visualization
     double stretching_energy = 0.;
     double bending_energy = 0.;
     double twisting_energy = 0.;
+    double potential_energy = 0.;
+    double kinetic_energy = 0.;
     std::vector<Eigen::Vector3d> vis_gradient;
     std::vector<Eigen::Vector3d> vis_stretching_force;
     std::vector<Eigen::Vector3d> vis_bending_force;
@@ -49,7 +57,7 @@ public:
     void initSimulation(int nv_, Eigen::VectorXd x_, Eigen::VectorXd theta_, std::vector<bool> is_fixed_,
             SimParameters params_);
 
-    void simulateOneStep();
+    virtual void simulateOneStep();
 
     void updateCenterlinePosition(void);
 
@@ -57,7 +65,9 @@ public:
 
     std::tuple<Eigen::MatrixXd, Eigen::SparseMatrix<double> > createZeroGradientAndHessian();
 
-    void computeGradientAndHessian(Eigen::VectorXd& gradient,
+    void iheartla_check();
+
+    virtual void computeGradientAndHessian(Eigen::VectorXd& gradient,
             Eigen::SparseMatrix<double>& hessian,
             Eigen::MatrixX3d& d3,
             Eigen::VectorXd& twist);
@@ -100,6 +110,8 @@ public:
             Eigen::VectorXd& twisting_force);
 
     double applyGravity(Eigen::VectorXd& gradient);
+
+    double computeKineticEnergy();
 
     void buildVisualization(Eigen::VectorXd& gradient);
 

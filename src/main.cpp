@@ -14,10 +14,27 @@ void discreteElasticRodsDriverCallback()
     ImGui::Text("Stretching Energy = %f", discrete_elastic_rods_driver.discrete_elastic_rods.stretching_energy);
     ImGui::Text("Bending Energy = %f", discrete_elastic_rods_driver.discrete_elastic_rods.bending_energy);
     ImGui::Text("Twisting Energy = %f", discrete_elastic_rods_driver.discrete_elastic_rods.twisting_energy);
+    ImGui::Text("Potential Energy = %f", discrete_elastic_rods_driver.discrete_elastic_rods.potential_energy);
+    ImGui::Text("Kinetic Energy = %f", discrete_elastic_rods_driver.discrete_elastic_rods.kinetic_energy);
+    ImGui::Text("Total Energy = %f", discrete_elastic_rods_driver.discrete_elastic_rods.stretching_energy+
+            discrete_elastic_rods_driver.discrete_elastic_rods.bending_energy+
+            discrete_elastic_rods_driver.discrete_elastic_rods.twisting_energy+
+            discrete_elastic_rods_driver.discrete_elastic_rods.potential_energy+
+            discrete_elastic_rods_driver.discrete_elastic_rods.kinetic_energy);
+    ImGui::Checkbox("stretching", &discrete_elastic_rods_driver.discrete_elastic_rods.params.stretching_energy_enabled);
+    ImGui::SameLine();
+    ImGui::Checkbox("bending", &discrete_elastic_rods_driver.discrete_elastic_rods.params.bending_energy_enabled);
+    ImGui::SameLine();
+    ImGui::Checkbox("twisting", &discrete_elastic_rods_driver.discrete_elastic_rods.params.twisting_energy_enabled);
+    ImGui::SameLine();
+    ImGui::Checkbox("gravity", &discrete_elastic_rods_driver.discrete_elastic_rods.params.gravity_enabled);
+    ImGui::InputDouble("time step dt", &discrete_elastic_rods_driver.discrete_elastic_rods.params.time_step);
     if (ImGui::Button("Run/Stop Simulation"))
         discrete_elastic_rods_driver.running = !discrete_elastic_rods_driver.running;
     ImGui::SameLine();
     if (ImGui::Button("Run One Time Step Simulation")) discrete_elastic_rods_driver.simulateOneStep();
+    ImGui::SameLine();
+    if (ImGui::Button("Reset Simulation")) discrete_elastic_rods_driver.resetSimulation();
     if (discrete_elastic_rods_driver.running) discrete_elastic_rods_driver.simulateOneStep();
 }
 
@@ -28,17 +45,12 @@ int main(int argc, char* argv[])
     int test = input.getIntegerCmdOption("-test");
 
     // polyscope setup
-    polyscope::options::autocenterStructures = true;
-    polyscope::options::autoscaleStructures = true;
+    polyscope::options::autocenterStructures = false;
+    polyscope::options::autoscaleStructures = false;
     switch (driver) {
     case 0: {
         polyscope::options::programName = "Discrete Elastic Rods Simulation";
         polyscope::options::printPrefix = "[DER] ";
-    }
-        break;
-    case 1: {
-        polyscope::options::programName = "Discrete Elastic Rods Based Additive Manufactured Parts Simulation";
-        polyscope::options::printPrefix = "[DER-AM] ";
     }
         break;
     default: {
@@ -53,10 +65,6 @@ int main(int argc, char* argv[])
         discrete_elastic_rods_driver.test = test;
         discrete_elastic_rods_driver.initialize();
         polyscope::state::userCallback = discreteElasticRodsDriverCallback;
-    }
-        break;
-    case 1: {
-        // TODO: discrete elastic rods based AM simulation
     }
         break;
     default: {

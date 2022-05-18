@@ -39,6 +39,7 @@ public:
         }
         return 0;
     }
+
 private:
     std::vector<std::string> tokens;
 };

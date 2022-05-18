@@ -6,7 +6,10 @@
 #include "polyscope/curve_network.h"
 // project
 #include "DiscreteElasticRods.h"
+#include "DiscreteElasticRodsVisualization.h"
 #include "SimParameters.h"
+
+typedef std::tuple<int, Eigen::VectorXd, Eigen::VectorXd, std::vector<bool>, SimParameters> RodInitConfiguration;
 
 class DiscreteElasticRodsDriver {
 public:
@@ -14,91 +17,53 @@ public:
     int test = 0;
 
     // visualization
-    polyscope::CurveNetwork* mesh = nullptr;
-    std::vector<Eigen::Vector3d> vis_nodes;
-    std::vector<std::array<size_t, 2>> vis_edges;
+    DiscreteElasticRodsVisualization discrete_elastic_rods_visualization;
 
     // status
     bool running = false;
+    RodInitConfiguration init_state;
 
     DiscreteElasticRodsDriver() = default;
-
-    void initVisualization(int nv, Eigen::VectorXd x_)
-    {
-        for (int i = 0; i<nv; i++) {
-            Eigen::Vector3d node(x_(3*i), x_(3*i+1), x_(3*i+2));
-            vis_nodes.push_back(node);
-        }
-        for (size_t i = 1; i<vis_nodes.size(); i++) {
-            std::array<size_t, 2> edge{i-1, i};
-            vis_edges.push_back(edge);
-        }
-    }
-
-    void updateVisualization(int nv, Eigen::VectorXd x_)
-    {
-        for (int i = 0; i<nv; i++) {
-            Eigen::Vector3d node(x_(3*i), x_(3*i+1), x_(3*i+2));
-            vis_nodes[i] = node;
-        }
-        // update curve network
-        mesh->updateNodePositions(vis_nodes);
-        mesh->removeAllQuantities();
-        mesh->addNodeVectorQuantity("Twisting Force", discrete_elastic_rods.vis_twisting_force);
-        mesh->addNodeVectorQuantity("Bending Force", discrete_elastic_rods.vis_bending_force);
-        mesh->addNodeVectorQuantity("Stretching Force", discrete_elastic_rods.vis_stretching_force);
-        mesh->addNodeVectorQuantity("Gradient", discrete_elastic_rods.vis_gradient);
-        mesh->addEdgeVectorQuantity("d1", discrete_elastic_rods.d1);
-        mesh->addEdgeVectorQuantity("d2", discrete_elastic_rods.d2);
-        mesh->getQuantity("d1")->setEnabled(true);
-        mesh->getQuantity("d2")->setEnabled(true);
-//        Eigen::MatrixX3d node_kb;
-//        node_kb.resize(discrete_elastic_rods.nv, 3);
-//        node_kb.setZero();
-//        for (int i = 1; i<discrete_elastic_rods.nv-1; i++)
-//            node_kb.row(i) = discrete_elastic_rods.kb.row(i-1);
-//        mesh->addNodeVectorQuantity("kb", node_kb);
-    }
 
     void initialize()
     {
         int nv = 0;
-        Eigen::VectorXd x_;
+        Eigen::VectorXd x;
         std::vector<bool> is_fixed;
         SimParameters params;
         Eigen::VectorXd theta;
 
         switch (test) {
-        case 0:std::cout << "case 0: testing stretching and bending energy" << std::endl;
-            nv = 10;
-            x_.resize(nv*3);
-            x_.setZero();
+        case 0:
+            std::cout << "case 0: testing stretching and bending energy" << std::endl;
+            nv = 4;
+            x.resize(nv*3);
+            x.setZero();
             theta.resize(nv-1);
             theta.setZero();
 
             for (int i = 0; i<nv; i++) {
-                x_(3*i) = (-(nv >> 1)+i);
+                x(3*i) = (-(nv >> 1)+i);
                 is_fixed.emplace_back(false);
             }
 
-            for (int i = 0; i<2; i++) {
-                is_fixed[i] = true;
-            }
+            is_fixed[0] = true;
 
             params.stretching_energy_enabled = true;
             params.bending_energy_enabled = true;
             params.twisting_energy_enabled = false;
             params.gravity_enabled = true;
             break;
-        case 1:std::cout << "case 1: testing twisting energy" << std::endl;
+        case 1:
+            std::cout << "case 1: testing twisting energy" << std::endl;
             nv = 10;
-            x_.resize(nv*3);
-            x_.setZero();
+            x.resize(nv*3);
+            x.setZero();
             theta.resize(nv-1);
             theta.setZero();
 
             for (int i = 0; i<nv; i++) {
-                x_(3*i) = (-(nv >> 1)+i);
+                x(3*i) = (-(nv >> 1)+i);
                 is_fixed.emplace_back(false);
             }
 
@@ -114,13 +79,37 @@ public:
             params.twisting_energy_enabled = true;
             params.gravity_enabled = true;
             break;
-        default:std::cout << "invalid test case" << std::endl;
+        case 2:
+            std::cout << "case 2: testing external force" << std::endl;
+            nv = 3;
+            x.resize(nv*3);
+            x.setZero();
+            theta.resize(nv-1);
+            theta.setZero();
+
+            for (int i = 0; i<nv; i++) {
+                x(3*i) = (-(nv >> 1)+i);
+                is_fixed.emplace_back(false);
+            }
+
+            is_fixed[0] = true;
+
+            params.stretching_energy_enabled = true;
+            params.bending_energy_enabled = false;
+            params.twisting_energy_enabled = false;
+            params.gravity_enabled = true;
+
+            discrete_elastic_rods.applyExternalForce = [this](Eigen::VectorXd& gradient) {
+                gradient(7) -= 9.0;
+            };
+            break;
+        default:
+            std::cout << "invalid test case" << std::endl;
         }
-        discrete_elastic_rods.initSimulation(nv, x_, theta, is_fixed, params);
-        initVisualization(nv, x_);
-        // init curve network
-        mesh = polyscope::registerCurveNetwork("Discrete Elastic Rods", vis_nodes, vis_edges);
-        updateVisualization(discrete_elastic_rods.nv, discrete_elastic_rods.x);
+        init_state = std::make_tuple(nv, x, theta, is_fixed, params);
+        discrete_elastic_rods.initSimulation(nv, x, theta, is_fixed, params);
+        discrete_elastic_rods_visualization.initVisualization(discrete_elastic_rods, "Discrete Elastic Rods");
+        discrete_elastic_rods_visualization.updateVisualization(discrete_elastic_rods);
     }
 
     void simulateOneStep()
@@ -130,7 +119,14 @@ public:
             //std::cout << "======== step " << inner << " ========" << std::endl;
             discrete_elastic_rods.simulateOneStep();
         }
-        updateVisualization(discrete_elastic_rods.nv, discrete_elastic_rods.x);
+        discrete_elastic_rods_visualization.updateVisualization(discrete_elastic_rods);
+    }
+
+    void resetSimulation()
+    {
+        discrete_elastic_rods.initSimulation(std::get<0>(init_state), std::get<1>(init_state), std::get<2>(init_state),
+                std::get<3>(init_state), std::get<4>(init_state));
+        discrete_elastic_rods_visualization.updateVisualization(discrete_elastic_rods);
     }
 };
 

@@ -1,6 +1,7 @@
 #include "DiscreteElasticRods.h"
 #include <iostream>
 #include <utility>
+#include "lib.h"
 
 DiscreteElasticRods::DiscreteElasticRods() { }
 
@@ -8,8 +9,8 @@ void DiscreteElasticRods::initSimulation(int nv_, Eigen::VectorXd x_, Eigen::Vec
         std::vector<bool> is_fixed_, SimParameters params_)
 {
     nv = nv_;
-    x = std::move(x_);
-    is_fixed = std::move(is_fixed_);
+    x_ref = x = x_;
+    is_fixed = is_fixed_;
     v.resize(nv*3);
     v.setZero();
 
@@ -28,7 +29,7 @@ void DiscreteElasticRods::initSimulation(int nv_, Eigen::VectorXd x_, Eigen::Vec
     Eigen::MatrixX3d d3 = unitTangents(x);
 
     // set up reference frame
-    theta = std::move(theta_);
+    theta = theta_;
 //    theta.resize(nv-1);
 //    theta.setZero();
     d1_ref.resize(nv-1, 3);
@@ -47,6 +48,7 @@ void DiscreteElasticRods::initSimulation(int nv_, Eigen::VectorXd x_, Eigen::Vec
 
     kb.resize(nv-2, 3);
     updateCurvatureBinormal(d3);
+    kb_ref = kb;
     getMaterialCurvature(kappa_ref);
     twist_rest.resize(nv-2);
     twist_rest.setZero();
@@ -63,7 +65,7 @@ void DiscreteElasticRods::initSimulation(int nv_, Eigen::VectorXd x_, Eigen::Vec
 void DiscreteElasticRods::simulateOneStep()
 {
     Eigen::MatrixX3d prev_d3 = unitTangents(x);
-    updateCenterlinePosition();
+    updateCenterlinePosition(); // xi+1 = xi + dt * vi
     Eigen::MatrixX3d d3 = unitTangents(x);
     updateMaterialFrame(prev_d3, d3);
 
@@ -76,7 +78,8 @@ void DiscreteElasticRods::simulateOneStep()
     Eigen::SparseMatrix<double> hessian;
     if (verbose) std::cout << "- Computing Energy" << std::endl;
     computeGradientAndHessian(gradient, hessian, d3, twist);
-    updateCenterlineVelocity(gradient);
+    updateCenterlineVelocity(gradient); // vi+1 = vi + dt * F/m
+    kinetic_energy = computeKineticEnergy();
     updateFrameTheta(gradient);
     buildVisualization(gradient);
 }
@@ -109,11 +112,87 @@ std::tuple<Eigen::MatrixXd, Eigen::SparseMatrix<double> > DiscreteElasticRods::c
     return std::make_tuple(gradient, hessian);
 }
 
+void DiscreteElasticRods::iheartla_check()
+{
+    std::cout << "[Reference]: " << std::endl << "E_b: " << bending_energy << std::endl << "E_t: " << twisting_energy << std::endl << "E_s: " << stretching_energy << std::endl;
+
+    const int ne = nv-1;
+    const int nj = ne-1;
+    Eigen::MatrixX3d d3 = unitTangents(x);
+    std::vector<double> a(nj, params.segment_radius);
+    std::vector<double> b(nj, params.segment_radius);
+    std::vector<double> barl;
+    double E = params.bending_modulus;
+    std::vector<Eigen::Matrix<double, 3, 1>> kappab;
+    std::vector<Eigen::Matrix<double, 3, 1>> kappab_ref;
+    std::vector<Eigen::Matrix<double, 3, 1>> d_1;
+    std::vector<Eigen::Matrix<double, 3, 1>> d_2;
+    std::vector<Eigen::Matrix<double, 3, 1>> tilded_1;
+    std::vector<Eigen::Matrix<double, 3, 1>> tilded_2;
+    std::vector<Eigen::Matrix<double, 3, 1>> bard_1;
+    std::vector<Eigen::Matrix<double, 3, 1>> bard_2;
+    std::vector<Eigen::Matrix<double, 3, 1>> bartilded_1;
+    std::vector<Eigen::Matrix<double, 3, 1>> bartilded_2;
+    double G = params.twisting_modulus;
+    Eigen::VectorXd twist = getTwist(d2, d3);
+    std::vector<double> m;
+    std::vector<double> barm;
+    std::vector<Eigen::Matrix<double, 3, 1>> e;
+    std::vector<Eigen::Matrix<double, 3, 1>> bare;
+    double k_s = params.stretching_modulus;
+    for (int i = 1; i <= nj; i++) {
+        d_1.emplace_back(d1.row(i));
+        d_2.emplace_back(d2.row(i));
+        bard_1.emplace_back(d1_ref.row(i));
+        bard_2.emplace_back(d2_ref.row(i));
+    }
+    for (int i = 0; i < nj; i++) {
+        barl.emplace_back(l_ref[i]);
+        m.emplace_back(twist[i]);
+        barm.emplace_back(twist_rest[i]);
+        kappab.emplace_back(kb.row(i));
+        kappab_ref.emplace_back(kb_ref.row(i));
+        tilded_1.emplace_back(d1.row(i));
+        tilded_2.emplace_back(d2.row(i));
+        bartilded_1.emplace_back(d1_ref.row(i));
+        bartilded_2.emplace_back(d2_ref.row(i));
+        e.emplace_back(x.segment<3>(3*(i+1))-x.segment<3>(3*i));
+        bare.emplace_back(x_ref.segment<3>(3*(i+1))-x_ref.segment<3>(3*i));
+    }
+    struct context curr_context(
+            a,
+            b,
+            barl,
+            E,
+            kappab,
+            kappab_ref,
+            d_1,
+            d_2,
+            tilded_1,
+            tilded_2,
+            bard_1,
+            bard_2,
+            bartilded_1,
+            bartilded_2,
+            G,
+            m,
+            barm,
+            e,
+            bare,
+            k_s
+            );
+
+    std::cout << "[IHeartLA]: " << std::endl << "E_b: " << curr_context.E_b << std::endl << "E_t: " << curr_context.E_t << std::endl << "E_s: " << curr_context.E_s << std::endl;
+}
+
 void DiscreteElasticRods::computeGradientAndHessian(Eigen::VectorXd& gradient,
         Eigen::SparseMatrix<double>& hessian,
         Eigen::MatrixX3d& d3,
         Eigen::VectorXd& twist)
 {
+    // iheartla check
+    iheartla_check();
+
     Eigen::VectorXd stretching_force, bending_force, twisting_force;
     stretching_force.resize(3*nv);
     stretching_force.setZero();
@@ -124,7 +203,7 @@ void DiscreteElasticRods::computeGradientAndHessian(Eigen::VectorXd& gradient,
 
     std::tie(gradient, hessian) = createZeroGradientAndHessian();
     std::vector<Eigen::Triplet<double>>
-    hessian_triplets;
+            hessian_triplets;
 
     if (params.stretching_energy_enabled) {
         if (verbose) std::cout << "    - Computing Stretching Energy" << std::endl;
@@ -143,7 +222,12 @@ void DiscreteElasticRods::computeGradientAndHessian(Eigen::VectorXd& gradient,
 
     if (params.gravity_enabled) {
         if (verbose) std::cout << "    - Adding Gravity" << std::endl;
-        applyGravity(gradient);
+        potential_energy = applyGravity(gradient);
+    }
+
+    if (applyExternalForce!=nullptr) {
+        if (verbose) std::cout << "    - Adding External Force" << std::endl;
+        applyExternalForce(gradient);
     }
 
     hessian.setFromTriplets(hessian_triplets.begin(), hessian_triplets.end());
@@ -157,7 +241,7 @@ void DiscreteElasticRods::updateCenterlineVelocity(Eigen::VectorXd& gradient)
     for (int i = 0; i<nv; i++) {
         // TODO: add mass
         double m = 1;
-        v.segment<3>(3*i) -= h*gradient.segment<3>(3*i)/m;
+        if (!is_fixed[i]) v.segment<3>(3*i) -= h*gradient.segment<3>(3*i)/m;
     }
 
 }
@@ -268,16 +352,16 @@ double DiscreteElasticRods::applyStretchingForce(Eigen::VectorXd& gradient,
         const double b_i = r;
         // TODO: fix A_i = pi * a_j * b_j
         const double A_i = M_PI*a_i*b_i;
-        E_s += k*A_i*(std::pow(length(i)-length_rest(i), 2)-1)*length(i);
+        E_s += k*A_i*(std::pow(length(i)/length_rest(i)-1, 2))*length_rest(i);
 
         // ======== compute stretching force derivative ========
         double e_j_rest = length_rest(i);
         double e_j = length(i);
         Eigen::Vector3d t = d3.row(i).transpose();
-        gradient.segment<3>(3*i) += k*(e_j/e_j_rest-1)*-t;
-        gradient.segment<3>(3*(i+1)) += k*(e_j/e_j_rest-1)*t;
-        stretching_force.segment<3>(3*i) -= k*(e_j/e_j_rest-1)*-t;
-        stretching_force.segment<3>(3*(i+1)) -= k*(e_j/e_j_rest-1)*t;
+        gradient.segment<3>(3*i) += k*A_i*(e_j/e_j_rest-1)*-t;
+        gradient.segment<3>(3*(i+1)) += k*A_i*(e_j/e_j_rest-1)*t;
+        stretching_force.segment<3>(3*i) -= k*A_i*(e_j/e_j_rest-1)*-t;
+        stretching_force.segment<3>(3*(i+1)) -= k*A_i*(e_j/e_j_rest-1)*t;
 
         // TODO: check stretching hessian
         // ======== compute bending force hessian ========
@@ -426,12 +510,25 @@ double DiscreteElasticRods::applyTwistingForce(Eigen::VectorXd& gradient,
 double DiscreteElasticRods::applyGravity(Eigen::VectorXd& gradient)
 {
     const double g = params.gravity_G;
+    double E_g = 0.;
     for (int i = 0; i<nv; i++) {
         // TODO: add mass
         double m = 1;
+        E_g -= m*g*x(3*i+1);
         gradient(3*i+1) -= m*g;
     }
-    return 0;
+    return E_g;
+}
+
+double DiscreteElasticRods::computeKineticEnergy()
+{
+    double E_k = 0.;
+    for (int i = 0; i<nv; i++) {
+        // TODO: add mass
+        double m = 1.;
+        E_k += 1./2*m*((v.segment<3>(3*i)).squaredNorm());
+    }
+    return E_k;
 }
 
 void DiscreteElasticRods::buildVisualization(Eigen::VectorXd& gradient)
