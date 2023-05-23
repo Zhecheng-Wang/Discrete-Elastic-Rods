@@ -157,7 +157,7 @@ void DiscreteElasticRods::updateCenterlineVelocity(Eigen::VectorXd& gradient)
     for (int i = 0; i<nv; i++) {
         // TODO: add mass
         double m = 1;
-        v.segment<3>(3*i) -= h*gradient.segment<3>(3*i)/m;
+        if (!is_fixed[i]) v.segment<3>(3*i) -= h*gradient.segment<3>(3*i)/m;
     }
 
 }

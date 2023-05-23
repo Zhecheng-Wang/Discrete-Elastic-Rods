@@ -9,6 +9,7 @@
 #include <Eigen/Sparse>
 // project
 #include "SimParameters.h"
+#define M_PI 3.14159265359
 
 class DiscreteElasticRods {
 public:

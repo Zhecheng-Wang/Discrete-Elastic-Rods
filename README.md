@@ -4,6 +4,10 @@ Computational Science and Engineering Certificate Independent Research Project (
 This implementation adapted time-parallel frame in [[Bergou *et al.*, 2010]](http://www.cs.columbia.edu/cg/pdfs/171-threads.pdf) instead of space-parallel frame in [[Bergou *et al.*, 2008]](http://www.cs.columbia.edu/cg/pdfs/143-rods.pdf).
 
 ---
+### Update
+May 23, 2023: Plan to polish this repo soon. I will evaluate the correctness of the implementation and add more tests. I will also add more comments to the code. I think there are something wrong with the stretching energy computation...
+
+---
 ### Author
 Zhecheng Wang
 

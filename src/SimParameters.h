@@ -30,9 +30,9 @@ struct SimParameters {
       gravity_enabled = true;
       gravity_G = -9.8;
 
-      stretching_modulus = 1000;
-      bending_modulus = 1000000;
-      twisting_modulus = 10000;
+      stretching_modulus = 1e4;
+      bending_modulus = 1e7;
+      twisting_modulus = 1e5;
       segment_radius = 0.1;
 
       stretching_energy_enabled = true;
